@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SERP-X | Subterranean Extraction & Rescue Platform — Nutty Putty Cave Simulation</title>
+    <meta name="description"
+        content="Interactive rescue simulation with YOLOv8, Random Forest, A* pathfinding, and Knull Zone wedge prediction algorithms for cave extraction operations.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="scanline-overlay"></div>
+
+    <!-- ==================== HEADER ==================== -->
+    <header id="command-bar">
+        <div class="header-left">
+            <div class="logo-group">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 40 40" width="36" height="36">
+                        <circle cx="20" cy="20" r="18" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5"
+                            opacity="0.6" />
+                        <circle cx="20" cy="20" r="12" fill="none" stroke="var(--accent-cyan)" stroke-width="1" />
+                        <circle cx="20" cy="20" r="3" fill="var(--accent-cyan)" />
+                        <line x1="20" y1="2" x2="20" y2="8" stroke="var(--accent-cyan)" stroke-width="1.5" />
+                        <line x1="20" y1="32" x2="20" y2="38" stroke="var(--accent-cyan)" stroke-width="1.5" />
+                        <line x1="2" y1="20" x2="8" y2="20" stroke="var(--accent-cyan)" stroke-width="1.5" />
+                        <line x1="32" y1="20" x2="38" y2="20" stroke="var(--accent-cyan)" stroke-width="1.5" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>SERP-X</h1>
+                    <span class="subtitle">SUBTERRANEAN EXTRACTION & RESCUE PLATFORM</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="mission-badge">
+                <span class="badge-label">ACTIVE MISSION</span>
+                <span class="badge-value" id="mission-id">NUTTY-PUTTY-2025</span>
+            </div>
+            <div class="status-indicator" id="system-status">
+                <span class="status-dot"></span>
+                <span class="status-text">INITIALIZING</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="clock-group">
+                <div class="clock" id="mission-clock">00:00:00</div>
+                <span class="clock-label">MISSION ELAPSED</span>
+            </div>
+            <div class="clock-group">
+                <div class="clock" id="real-clock">--:--:--</div>
+                <span class="clock-label">LOCAL TIME</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN DASHBOARD ==================== -->
+    <main id="dashboard">
+
+        <!-- ========== LEFT: Cave + Robot Viz ========== -->
+        <section class="panel cave-panel" id="cave-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-cyan)">
+                        <rect x="1" y="1" width="6" height="6" rx="1" />
+                        <rect x="9" y="1" width="6" height="6" rx="1" />
+                        <rect x="1" y="9" width="6" height="6" rx="1" />
+                        <rect x="9" y="9" width="6" height="6" rx="1" />
+                    </svg>
+                    CAVE CROSS-SECTION — LIVE FEED
+                </div>
+                <div class="panel-controls">
+                    <button class="ctrl-btn" id="btn-start" onclick="startSimulation()">▶ DEPLOY</button>
+                    <button class="ctrl-btn" id="btn-pause" onclick="pauseSimulation()" disabled>⏸ HOLD</button>
+                    <button class="ctrl-btn" id="btn-continue" onclick="continueExploration()" style="display:none;">▶ CONTINUE</button>
+                    <button class="ctrl-btn" id="btn-reset" onclick="resetSimulation()">↺ RESET</button>
+                </div>
+            </div>
+            <div class="cave-viewport">
+                <canvas id="cave-canvas"></canvas>
+                <div class="cave-overlay-tl">
+                    <span id="robot-depth">DEPTH: 0.0m</span>
+                    <span id="robot-speed">SPEED: 0.0 m/s</span>
+                </div>
+                <div class="cave-overlay-tr" id="yolo-overlay" style="display:none;">
+                    <div class="yolo-badge">YOLOv8n</div>
+                    <span id="yolo-status">SCANNING...</span>
+                </div>
+                <div class="cave-legend">
+                    <span><i class="dot dot-robot"></i> SERP-X</span>
+                    <span><i class="dot dot-victim"></i> VICTIM</span>
+                    <span><i class="dot dot-hazard"></i> HAZARD</span>
+                    <span><i class="dot dot-route"></i> A* ROUTE</span>
+                    <span><i class="dot dot-gas"></i> GAS</span>
+                    <span><i class="dot dot-water"></i> WATER</span>
+                </div>
+            </div>
+
+            <!-- A* Pathfinding + 3D Map -->
+            <div class="sub-panels-row">
+                <div class="sub-panel" id="astar-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-green)">
+                                <path d="M1 15 L5 8 L9 11 L15 1" fill="none" stroke="var(--accent-green)"
+                                    stroke-width="1.5" />
+                            </svg>
+                            A* RESCUE ROUTE
+                        </div>
+                    </div>
+                    <canvas id="astar-canvas"></canvas>
+                </div>
+                <div class="sub-panel" id="map-3d-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-cyan)">
+                                <polygon points="8,1 15,5 15,11 8,15 1,11 1,5" fill="none" stroke="var(--accent-cyan)"
+                                    stroke-width="1" />
+                            </svg>
+                            3D TUNNEL MAP
+                        </div>
+                    </div>
+                    <canvas id="map-canvas"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== CENTER: Metrics + ML Panels ========== -->
+        <section class="panel metrics-panel" id="metrics-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-cyan)">
+                        <path d="M2 14 L2 2 L5 2 L5 14 Z M6 14 L6 6 L9 6 L9 14 Z M10 14 L10 4 L13 4 L13 14 Z" />
+                    </svg>
+                    TELEMETRY &amp; ML ANALYSIS
+                </div>
+            </div>
+            <div class="metrics-scroll">
+                <!-- Row 1: Tunnel dims -->
+                <div class="metrics-row">
+                    <div class="metric-card" id="metric-width">
+                        <div class="metric-header-row">
+                            <span class="metric-label">TUNNEL WIDTH</span>
+                            <span class="metric-value" id="val-width">--<small>cm</small></span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill" id="bar-width"></div>
+                        </div>
+                    </div>
+                    <div class="metric-card" id="metric-height">
+                        <div class="metric-header-row">
+                            <span class="metric-label">TUNNEL HEIGHT</span>
+                            <span class="metric-value" id="val-height">--<small>cm</small></span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill bar-orange" id="bar-height"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Orientation + Air -->
+                <div class="metrics-row">
+                    <div class="metric-card" id="metric-orientation">
+                        <div class="metric-header-row">
+                            <span class="metric-label">VICTIM ORIENTATION</span>
+                        </div>
+                        <div class="orientation-row">
+                            <canvas id="orientation-canvas" width="80" height="50"></canvas>
+                            <span class="metric-value text-val" id="val-orientation">--</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" id="metric-air">
+                        <div class="metric-header-row">
+                            <span class="metric-label">AIR QUALITY (O₂)</span>
+                            <span class="metric-value" id="val-air">--<small>%</small></span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill bar-green" id="bar-air"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 3: MQ Sensors (CO & CH4) -->
+                <div class="metrics-row">
+                    <div class="metric-card" id="metric-co">
+                        <div class="metric-header-row">
+                            <span class="metric-label">CARBON MONOXIDE (CO)</span>
+                            <span class="metric-value" id="val-co">--<small>ppm</small></span>
+                        </div>
+                        <div class="metric-bar"><div class="metric-bar-fill bar-purple" id="bar-co"></div></div>
+                    </div>
+                    <div class="metric-card" id="metric-ch4">
+                        <div class="metric-header-row">
+                            <span class="metric-label">METHANE (CH₄)</span>
+                            <span class="metric-value" id="val-ch4">--<small>LEL%</small></span>
+                        </div>
+                        <div class="metric-bar"><div class="metric-bar-fill bar-magenta" id="bar-ch4"></div></div>
+                    </div>
+                </div>
+
+                <!-- YOLO v8 Nano Detection -->
+                <div class="ml-card" id="ml-yolo">
+                    <div class="ml-card-header">
+                        <span class="ml-algo-badge">YOLOv8n</span>
+                        <span class="ml-card-title">VICTIM DETECTION</span>
+                        <span class="ml-status" id="yolo-ml-status">STANDBY</span>
+                    </div>
+                    <div class="ml-card-body">
+                        <div class="yolo-grid">
+                            <div class="yolo-metric">
+                                <span class="ym-label">CLASS</span>
+                                <span class="ym-value" id="yolo-class">--</span>
+                            </div>
+                            <div class="yolo-metric">
+                                <span class="ym-label">CONFIDENCE</span>
+                                <span class="ym-value highlight" id="yolo-confidence">--%</span>
+                            </div>
+                            <div class="yolo-metric">
+                                <span class="ym-label">BBOX</span>
+                                <span class="ym-value" id="yolo-bbox">--</span>
+                            </div>
+                            <div class="yolo-metric">
+                                <span class="ym-label">INFERENCE</span>
+                                <span class="ym-value" id="yolo-inference">-- ms</span>
+                            </div>
+                        </div>
+                        <div class="yolo-conf-bar">
+                            <div class="yolo-conf-fill" id="yolo-conf-fill"></div>
+                            <div class="yolo-conf-markers">
+                                <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Random Forest Hazard Detection -->
+                <div class="ml-card" id="ml-hazard">
+                    <div class="ml-card-header">
+                        <span class="ml-algo-badge rf">Random Forest</span>
+                        <span class="ml-card-title">HAZARD DETECTION</span>
+                        <span class="ml-status" id="hazard-ml-status">STANDBY</span>
+                    </div>
+                    <div class="ml-card-body">
+                        <div class="hazard-result" id="hazard-result">
+                            <div class="hazard-level" id="hazard-level">--</div>
+                            <div class="hazard-probabilities">
+                                <div class="hazard-prob-item">
+                                    <span class="hp-label">SAFE</span>
+                                    <div class="hp-bar">
+                                        <div class="hp-fill hp-safe" id="hp-safe"></div>
+                                    </div>
+                                    <span class="hp-val" id="hp-safe-val">--%</span>
+                                </div>
+                                <div class="hazard-prob-item">
+                                    <span class="hp-label">CAUTION</span>
+                                    <div class="hp-bar">
+                                        <div class="hp-fill hp-caution" id="hp-caution"></div>
+                                    </div>
+                                    <span class="hp-val" id="hp-caution-val">--%</span>
+                                </div>
+                                <div class="hazard-prob-item">
+                                    <span class="hp-label">DANGER</span>
+                                    <div class="hp-bar">
+                                        <div class="hp-fill hp-danger" id="hp-danger"></div>
+                                    </div>
+                                    <span class="hp-val" id="hp-danger-val">--%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rf-trees" id="rf-trees">
+                            <!-- Decision trees rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wedge Prediction -->
+                <div class="ml-card" id="ml-wedge">
+                    <div class="ml-card-header">
+                        <span class="ml-algo-badge wedge">Knull Zone</span>
+                        <span class="ml-card-title">KNULL ZONE RISK PREDICTION</span>
+                        <span class="ml-status" id="wedge-ml-status">STANDBY</span>
+                    </div>
+                    <div class="ml-card-body">
+                        <div class="wedge-params">
+                            <div class="wp-item">
+                                <span class="wp-label">Tunnel Width</span>
+                                <span class="wp-value" id="wp-twidth">-- cm</span>
+                            </div>
+                            <div class="wp-item">
+                                <span class="wp-label">Tunnel Height</span>
+                                <span class="wp-value" id="wp-theight">-- cm</span>
+                            </div>
+                            <div class="wp-item">
+                                <span class="wp-label">Slope Angle</span>
+                                <span class="wp-value" id="wp-slope">-- °</span>
+                            </div>
+                            <div class="wp-item">
+                                <span class="wp-label">Shoulder Width</span>
+                                <span class="wp-value" id="wp-shoulder">45.7 cm</span>
+                            </div>
+                        </div>
+                        <div class="wedge-score-row">
+                            <div class="wedge-gauge">
+                                <canvas id="wedge-gauge-canvas" width="140" height="80"></canvas>
+                            </div>
+                            <div class="wedge-verdict" id="wedge-verdict">
+                                <span class="wv-label">KNULL ZONE RISK</span>
+                                <span class="wv-score" id="wedge-score">--</span>
+                                <span class="wv-unit">/ 100</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extraction Feasibility (Random Forest Regressor) -->
+                <div class="ml-card" id="ml-extraction">
+                    <div class="ml-card-header">
+                        <span class="ml-algo-badge rf">RF Regressor</span>
+                        <span class="ml-card-title">EXTRACTION FEASIBILITY</span>
+                        <span class="ml-status" id="extract-ml-status">STANDBY</span>
+                    </div>
+                    <div class="ml-card-body">
+                        <div class="extraction-row">
+                            <canvas id="gauge-canvas" width="160" height="90"></canvas>
+                            <div class="extraction-details">
+                                <div class="ed-item">
+                                    <span class="ed-label">PROBABILITY</span>
+                                    <span class="ed-value" id="val-extraction">--%</span>
+                                </div>
+                                <div class="ed-item">
+                                    <span class="ed-label">EST. TIME</span>
+                                    <span class="ed-value" id="val-est-time">-- hrs</span>
+                                </div>
+                                <div class="ed-item">
+                                    <span class="ed-label">TREES USED</span>
+                                    <span class="ed-value" id="val-trees">100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== RIGHT: AI + Logs ========== -->
+        <section class="panel ai-panel" id="ai-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-cyan)">
+                        <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5" />
+                        <circle cx="8" cy="8" r="2" fill="var(--accent-cyan)" />
+                    </svg>
+                    AI COMMAND CENTER
+                </div>
+            </div>
+
+            <!-- AI Recommendation -->
+            <div class="ai-recommendation" id="ai-recommendation">
+                <div class="ai-rec-header">
+                    <span class="ai-rec-label">PRIMARY RECOMMENDATION</span>
+                    <span class="ai-rec-confidence" id="ai-confidence">CONFIDENCE: --</span>
+                </div>
+                <div class="ai-rec-value" id="ai-rec-value">AWAITING DATA...</div>
+                <div class="ai-rec-reason" id="ai-rec-reason">Deploy SERP-X to begin environmental assessment and ML
+                    pipeline initialization.</div>
+            </div>
+
+            <!-- Phase Tracker -->
+            <div class="phase-tracker">
+                <div class="phase-title">OPERATION PHASES</div>
+                <div class="phase-list">
+                    <div class="phase-item active" id="phase-1"><span class="phase-num">01</span><span
+                            class="phase-name">DEPLOYMENT</span><span class="phase-status"
+                            id="phase-1-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-2"><span class="phase-num">02</span><span
+                            class="phase-name">EXPLORATION</span><span class="phase-status"
+                            id="phase-2-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-3"><span class="phase-num">03</span><span
+                            class="phase-name">YOLOv8 DETECTION</span><span class="phase-status"
+                            id="phase-3-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-4"><span class="phase-num">04</span><span class="phase-name">3D
+                            MAPPING</span><span class="phase-status" id="phase-4-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-5"><span class="phase-num">05</span><span class="phase-name">RF
+                            HAZARD ANALYSIS</span><span class="phase-status" id="phase-5-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-6"><span class="phase-num">06</span><span class="phase-name">WEDGE
+                            PREDICTION</span><span class="phase-status" id="phase-6-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-7"><span class="phase-num">07</span><span class="phase-name">A*
+                            PATHFINDING</span><span class="phase-status" id="phase-7-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-8"><span class="phase-num">08</span><span class="phase-name">RF
+                            EXTRACTION</span><span class="phase-status" id="phase-8-status">PENDING</span></div>
+                    <div class="phase-item" id="phase-9"><span class="phase-num">09</span><span class="phase-name">DEEP
+                            EXPLORATION</span><span class="phase-status" id="phase-9-status">STANDBY</span></div>
+                </div>
+            </div>
+
+            <!-- Event Log -->
+            <div class="event-log-container">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-cyan)">
+                            <rect x="2" y="2" width="12" height="3" rx="1" />
+                            <rect x="2" y="7" width="12" height="3" rx="1" />
+                            <rect x="2" y="12" width="12" height="3" rx="1" />
+                        </svg>
+                        OPERATION LOG
+                    </div>
+                </div>
+                <div class="event-log" id="event-log">
+                    <div class="log-entry log-system">
+                        <span class="log-time">00:00:00</span>
+                        <span class="log-tag">SYS</span>
+                        <span class="log-msg">SERP-X initialized. ML pipelines loaded: YOLOv8n, RandomForest,
+                            A*.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rescue Strategies -->
+            <div class="strategies-panel" id="strategies-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-orange)">
+                            <path d="M8 1 L15 8 L8 15 L1 8 Z" fill="none" stroke="var(--accent-orange)"
+                                stroke-width="1.5" />
+                        </svg>
+                        RESCUE STRATEGIES
+                    </div>
+                </div>
+                <div class="strategies-list" id="strategies-list">
+                    <div class="strategy-placeholder">Strategies generated after all ML analyses complete.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer id="status-bar">
+        <div class="status-left">
+            <span class="sb-item"><span class="sb-dot sb-green"></span> COMMS: ACTIVE</span>
+            <span class="sb-item"><span class="sb-dot sb-green"></span> LIDAR: ONLINE</span>
+            <span class="sb-item"><span class="sb-dot sb-green"></span> THERMAL: ONLINE</span>
+            <span class="sb-item" id="sb-battery"><span class="sb-dot sb-green"></span> BATTERY: 100%</span>
+        </div>
+        <div class="status-center">
+            <span id="status-message">SYSTEM READY — AWAITING DEPLOYMENT</span>
+        </div>
+        <div class="status-right">
+            <span class="sb-item">FREQ: 915 MHz</span>
+            <span class="sb-item">LAT: 39.9468°N</span>
+            <span class="sb-item">LON: 111.8517°W</span>
+        </div>
+    </footer>
+
+    <script src="algorithms.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
